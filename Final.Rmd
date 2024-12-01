@@ -1,10 +1,7 @@
-Name: Aditya Chauhan
-ID: 169027493
-Class: DATA 100 A
-Professor: Dr. Devon Becker
-Dataset: Air Quality (UC Irvine) (Vito, S. (2008). Air Quality [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C59K5F.)
+Name: Aditya Chauhan ID: 169027493 Class: DATA 100 A Professor: Dr. Devon Becker Dataset: Air Quality (UC Irvine) (Vito, S. (2008). Air Quality [Dataset]. UCI Machine Learning Repository. <https://doi.org/10.24432/C59K5F>.)
 
 # Library Loads & Data Imports
+
 ```{r}
 library(readxl)
 library(tidyverse)
@@ -23,6 +20,7 @@ head(air_quality_data)
 ```
 
 # Creating Categorical Features
+
 ```{r}
 
 air_quality_data <- air_quality_data |>
@@ -51,8 +49,8 @@ air_quality_data <- air_quality_data |>
 
 ```
 
-
 # Exploratory Analysis
+
 ```{r}
 
 ggplot(air_quality_data, aes(x = T, y = `CO(GT)`, color = TimePeriod)) +
@@ -73,25 +71,22 @@ ggplot(air_quality_data, aes(x = DayOfWeek, y = `CO(GT)`)) +
 
 ```
 
-
 # Summary Statistics
+
 ```{r}
-# Summary statistics
 summary(air_quality_data$`CO(GT)`)
 table(air_quality_data$TimePeriod)
 ```
 
-
 # Modelling Setup
+
 ```{r}
 set.seed(123)
 
-# Create splits
 split <- initial_split(air_quality_data, prop = 0.7)
 train_data <- training(split)
 test_data <- testing(split)
 
-# Further split train_data into training and validation
 val_split <- initial_split(train_data, prop = 0.8)
 train_data <- training(val_split)
 val_data <- testing(val_split)
@@ -99,30 +94,24 @@ val_data <- testing(val_split)
 
 # Linear Regression Model
 ```{r}
-# Define a linear regression model
 lm_model <- linear_reg() |>
   set_engine("lm")
 
-# Create a recipe for preprocessing
 lm_recipe <- recipe(`CO(GT)` ~ T + RH + TempRange + TimePeriod + HumidityRange, data = train_data) %>%
-  step_dummy(all_nominal(), -all_outcomes()) |> # One-hot encode categorical variables
-  step_normalize(all_predictors())              # Normalize continuous predictors
+  step_dummy(all_nominal(), -all_outcomes()) |>
+  step_normalize(all_predictors())
 
-# Create a workflow
 lm_workflow <- workflow() |>
   add_model(lm_model) |>
   add_recipe(lm_recipe)
 
-# Fit the model
 lm_fit <- lm_workflow |>
   fit(data = train_data)
 
-# Evaluate on validation set
 val_predictions <- lm_fit |>
   predict(new_data = val_data) |>
   bind_cols(val_data)
 
-# Calculate RMSE
 val_rmse <- rmse(val_predictions, truth = `CO(GT)`, estimate = .pred)
 val_rmse
 ```
