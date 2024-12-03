@@ -1,117 +1,149 @@
-Name: Aditya Chauhan ID: 169027493 Class: DATA 100 A Professor: Dr. Devon Becker Dataset: Air Quality (UC Irvine) (Vito, S. (2008). Air Quality [Dataset]. UCI Machine Learning Repository. <https://doi.org/10.24432/C59K5F>.)
+Name: Aditya Chauhan
 
-# Library Loads & Data Imports
+ID: 169027493
 
+Class: DATA 100 A
+
+Professor: Dr. Devon Becker
+
+Dataset: Air Quality (UC Irvine) (Vito, S. (2008). Air Quality [Dataset]. UCI Machine Learning Repository. <https://doi.org/10.24432/C59K5F>.)
+
+# Introduction
+
+Carbon monoxide (CO) is a toxic air pollutant produced primarily by vehicle emissions and industrial processes. Its concentration in the air is a critical metric for evaluating urban air quality. CO exposure can have adverse effects on public health, particularly for vulnerable populations like children and the elderly. This study aims to explore the factors contributing to carbon monoxide levels and predict these concentrations based on weather and other air quality measurements.
+
+# Research Question: 
+
+Can we develop a reliable model to predict CO concentrations based on temperature, humidity, and sensor data?
+
+# Preprocessing
+
+## Library Loads & Data Imports
 ```{r}
 library(readxl)
 library(tidyverse)
 library(ggplot2)
 library(tidymodels)
-
-
-file_path <- "AirQualityUCI.xlsx"
+library(patchwork)
+library(lubridate)
+library(zoo)
+library(reshape2)
 
 air_quality_data <- read_excel("AirQualityUCI.xlsx", sheet = "AirQualityUCI")
-
-str(air_quality_data)
-
-head(air_quality_data)
-
 ```
 
-# Creating Categorical Features
-
+## Creating Categorical Features
 ```{r}
+# Define pollutant columns based on existing column names
+pollutant_columns <- c("CO(GT)", "NOx(GT)", "NO2(GT)")
 
+# Grouping by Season and handling outliers in pollutant columns
+air_quality_data <- air_quality_data |>
+  group_by(Season = case_when(
+    format(Date, "%m") %in% c("12", "01", "02") ~ "Winter",
+    format(Date, "%m") %in% c("03", "04", "05") ~ "Spring",
+    format(Date, "%m") %in% c("06", "07", "08") ~ "Summer",
+    format(Date, "%m") %in% c("09", "10", "11") ~ "Autumn"
+  )) |>
+  mutate(
+    across(all_of(pollutant_columns), 
+           ~ ifelse(. > quantile(., 0.95, na.rm = TRUE), 
+                    median(., na.rm = TRUE), .))
+  ) |>
+  ungroup()
+
+# Create additional categorical features
 air_quality_data <- air_quality_data |>
   mutate(
     DayOfWeek = weekdays(Date),
-    TimePeriod = case_when(
-      as.numeric(substr(Time, 1, 2)) < 6 ~ "Night",
-      as.numeric(substr(Time, 1, 2)) < 12 ~ "Morning",
-      as.numeric(substr(Time, 1, 2)) < 18 ~ "Afternoon",
-      TRUE ~ "Evening"
-    ),
-    Month = months(Date),
     
-    TempRange = case_when(
+    Weekend = if_else(DayOfWeek %in% c("Saturday", "Sunday"), "Weekend", "Weekday"),
+    
+    Month = format(Date, "%B"), 
+    
+    Hour = as.numeric(format(Time, "%H")), 
+    TimeOfDay = case_when(
+      Hour >= 5 & Hour < 12 ~ "Morning",
+      Hour >= 12 & Hour < 17 ~ "Afternoon",
+      Hour >= 17 & Hour < 21 ~ "Evening",
+      TRUE ~ "Night"
+    ),
+    
+    # Temperature Categories
+    TempCategory = case_when(
       T < 10 ~ "Cold",
-      T >= 10 & T < 20 ~ "Moderate",
-      T >= 20 ~ "Hot"
+      T >= 10 & T <= 25 ~ "Moderate",
+      T > 25 ~ "Hot"
     ),
     
-    HumidityRange = case_when(
-      RH < 40 ~ "Low",
-      RH >= 40 & RH < 70 ~ "Medium",
-      RH >= 70 ~ "High"
+    # Humidity Levels
+    HumidityLevel = case_when(
+      RH < 30 ~ "Low",
+      RH >= 30 & RH <= 60 ~ "Medium",
+      RH > 60 ~ "High"
     )
   )
 
 ```
 
-# Exploratory Analysis
+## Other Preprocessing
 
 ```{r}
+# Handling missing values
+air_quality_data <- air_quality_data |>
+  mutate(
+    across(c(`NOx(GT)`, `NO2(GT)`), ~ na_if(., -200))
+  ) |>
+  drop_na() 
 
-ggplot(air_quality_data, aes(x = T, y = `CO(GT)`, color = TimePeriod)) +
-  geom_point(alpha = 0.5) +
-  labs(
-    title = "Temperature vs CO(GT)",
-    x = "Temperature (°C)",
-    y = "Carbon Monoxide (mg/m^3)"
+# Normalize / Standardize Cont. Vars
+air_quality_data <- air_quality_data |>
+  mutate(
+    across(c(T, RH, AH), ~ (. - mean(., na.rm = TRUE)) / sd(., na.rm = TRUE))
   )
 
-ggplot(air_quality_data, aes(x = DayOfWeek, y = `CO(GT)`)) +
-  geom_boxplot() +
-  labs(
-    title = "CO(GT) by Day of the Week",
-    x = "Day of the Week",
-    y = "Carbon Monoxide (mg/m^3)"
+# Interaction term
+air_quality_data <- air_quality_data |>
+  mutate(
+    Temp_Humidity_Interaction = T * RH,
+    CO_Temp_Interaction = `CO(GT)` * T
   )
 
-```
+# Rolling average
+air_quality_data <- air_quality_data |>
+  arrange(Date, Time) |> # Ensure data is sorted chronologically
+  mutate(
+    Rolling_CO = rollmean(`CO(GT)`, k = 5, fill = NA)
+  )
 
-# Summary Statistics
+# Correlation Matrix
+cor_matrix <- air_quality_data |>
+  select(`CO(GT)`, T, RH, AH, `NOx(GT)`, `NO2(GT)`) |>
+  cor(use = "complete.obs")
+print(cor_matrix)
 
-```{r}
-summary(air_quality_data$`CO(GT)`)
-table(air_quality_data$TimePeriod)
-```
+# Correlation Matrix Plot
+numeric_cols <- air_quality_data |>
+  select(where(is.numeric))
 
-# Modelling Setup
+cor_matrix <- cor(numeric_cols, use = "complete.obs")
+cor_melt <- melt(cor_matrix)
 
-```{r}
+ggplot(cor_melt, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") + 
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+                       midpoint = 0, limit = c(-1, 1), space = "Lab",
+                       name = "Correlation") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)
+  ) + 
+  labs(title = "Correlation Matrix", x = "Features", y = "Features")
+
+# Split dataset
 set.seed(123)
+data_split <- initial_split(air_quality_data, prop = 0.7)
+train_data <- training(data_split)
+test_data <- testing(data_split)
 
-split <- initial_split(air_quality_data, prop = 0.7)
-train_data <- training(split)
-test_data <- testing(split)
-
-val_split <- initial_split(train_data, prop = 0.8)
-train_data <- training(val_split)
-val_data <- testing(val_split)
-```
-
-# Linear Regression Model
-```{r}
-lm_model <- linear_reg() |>
-  set_engine("lm")
-
-lm_recipe <- recipe(`CO(GT)` ~ T + RH + TempRange + TimePeriod + HumidityRange, data = train_data) %>%
-  step_dummy(all_nominal(), -all_outcomes()) |>
-  step_normalize(all_predictors())
-
-lm_workflow <- workflow() |>
-  add_model(lm_model) |>
-  add_recipe(lm_recipe)
-
-lm_fit <- lm_workflow |>
-  fit(data = train_data)
-
-val_predictions <- lm_fit |>
-  predict(new_data = val_data) |>
-  bind_cols(val_data)
-
-val_rmse <- rmse(val_predictions, truth = `CO(GT)`, estimate = .pred)
-val_rmse
 ```
