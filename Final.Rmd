@@ -28,6 +28,8 @@ library(patchwork)
 library(lubridate)
 library(zoo)
 library(reshape2)
+library(dplyr)
+library(RColorBrewer)
 
 air_quality_data <- read_excel("AirQualityUCI.xlsx", sheet = "AirQualityUCI")
 ```
@@ -117,10 +119,10 @@ air_quality_data <- air_quality_data |>
   )
 
 # Correlation Matrix
-cor_matrix <- air_quality_data |>
-  select(`CO(GT)`, T, RH, AH, `NOx(GT)`, `NO2(GT)`) |>
-  cor(use = "complete.obs")
-print(cor_matrix)
+numeric_cols <- air_quality_data |>
+  select(where(is.numeric))
+cor_matrix <- cor(numeric_cols, use = "complete.obs")
+#print(cor_matrix)
 
 # Correlation Matrix Plot
 numeric_cols <- air_quality_data |>
@@ -146,4 +148,71 @@ data_split <- initial_split(air_quality_data, prop = 0.7)
 train_data <- training(data_split)
 test_data <- testing(data_split)
 
+```
+
+
+# Exploratory Analysis
+
+```{r}
+# Define dynamic ranges for CO(GT) and other key variables
+co_gt_limits <- c(-10, 10) # Adjusted for better scaling based on actual values
+ozone_sensor_limits <- c(200, 2500) # For ozone sensor data
+temp_limits <- c(-10, 40) # Temperature range
+
+# 1. Relationship Between NOx(GT) and CO(GT)
+plot1 <- ggplot(air_quality_data, aes(x = `NOx(GT)`, y = `CO(GT)`)) +
+  geom_point(alpha = 0.6, color = "steelblue", size = 1) +
+  geom_smooth(method = "lm", se = TRUE, color = "darkred", linetype = "dashed", size = 1) +
+  scale_y_continuous(limits = co_gt_limits) +
+  scale_x_continuous(limits = c(0, 500)) +
+  labs(title = "NOx(GT) vs CO(GT)",
+       x = "NOx(GT) (Nitrogen Oxides)",
+       y = "CO(GT) (Carbon Monoxide)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+
+# 4. Sensor Data vs CO(GT)
+plot4 <- ggplot(air_quality_data, aes(x = `PT08.S1(CO)`, y = `CO(GT)`)) +
+  geom_point(alpha = 0.5, aes(color = `PT08.S1(CO)`), size = 1.5) +
+  geom_smooth(method = "lm", se = TRUE, color = "darkgreen", linetype = "solid", size = 1) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  scale_y_continuous(limits = co_gt_limits) +
+  scale_x_continuous(limits = c(0, 2000)) +
+  labs(title = "Sensor Data vs CO(GT)",
+       x = "PT08.S1(CO) (Sensor Data)",
+       y = "CO(GT) (Carbon Monoxide)",
+       color = "Sensor Value") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+
+# 5. Seasonal Trends in CO(GT)
+plot5 <- ggplot(air_quality_data, aes(x = Season, y = `CO(GT)`, fill = Season)) +
+  geom_boxplot(outlier.shape = 21, outlier.fill = "red", outlier.size = 2, alpha = 0.7) +
+  scale_fill_brewer(palette = "Pastel2") +
+  scale_y_continuous(limits = co_gt_limits) +
+  labs(title = "Seasonal Trends in CO(GT)",
+       x = "Season",
+       y = "CO(GT) (Carbon Monoxide)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "none")
+
+# 7. NOx(GT) vs Ozone Sensor Data
+plot7 <- ggplot(air_quality_data, aes(x = `NOx(GT)`, y = `PT08.S5(O3)`)) +
+  geom_point(alpha = 0.5, color = "cyan", size = 1.5) +
+  geom_smooth(method = "lm", se = TRUE, color = "blue", size = 1.2, linetype = "solid") +
+  scale_y_continuous(limits = ozone_sensor_limits) +
+  scale_x_continuous(limits = c(0, 500)) +
+  labs(title = "NOx(GT) vs Ozone Sensor",
+       x = "NOx(GT) (Nitrogen Oxides)",
+       y = "PT08.S5(O3) (Ozone Sensor)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+
+# Arrange plots with spacing and better proportions
+final_plot <- (plot1 | plot4) / (plot5 | plot7)  +
+  plot_layout(guides = "collect") & theme(legend.position = "bottom")
+
+# Render the final plot
+final_plot
 ```
