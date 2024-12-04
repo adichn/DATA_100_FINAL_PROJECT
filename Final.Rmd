@@ -1,20 +1,30 @@
-Name: Aditya Chauhan
+---------------------------------
 
-ID: 169027493
+### Name: Aditya Chauhan
 
-Class: DATA 100 A
+### ID: 169027493
 
-Professor: Dr. Devon Becker
+### Class: DATA 100 A
 
-Dataset: Air Quality (UC Irvine) (Vito, S. (2008). Air Quality [Dataset]. UCI Machine Learning Repository. <https://doi.org/10.24432/C59K5F>.)
+### Professor: Dr. Devon Becker
+
+---------------------------------
 
 # Introduction
 
-Accurate air quality monitoring relies on sensor data to track pollutants like ozone, carbon monoxide, and nitrogen oxides. Understanding the relationship between sensor data and measured pollutants is crucial for validating monitoring technologies and enhancing predictive capabilities.
+## Dataset: 
 
-# Research Question: 
+Air Quality (UC Irvine) (Vito, S. (2008). Air Quality [Dataset]. UCI Machine Learning Repository. <https://doi.org/10.24432/C59K5F>.)
 
-How do sensor measurements (e.g., PT08.S1(CO) and PT08.S5(O3)) correlate with observed pollutant levels such as NOx and CO, and can these correlations help refine air quality predictions?
+## Abstract
+
+Accurate air quality monitoring relies on sensor data to measure pollutants such as ozone, carbon monoxide, and nitrogen oxides. This study examines the correlation between sensor readings and measured pollutant levels to validate monitoring technologies and enhance their predictive capabilities. By leveraging models, I aim to predict carbon monoxide concentrations based on sensor data and other environmental factors.
+
+# Goals/Research Question: 
+
+How do sensor measurements (PT08.S1(CO) and PT08.S5(O3)) correlate with observed pollutant levels (NOx(GT) and CO(GT))?
+
+Can these relationships improve the accuracy of carbon monoxide concentration predictions?
 
 Descriptive Features:
 - Continuous
@@ -27,7 +37,7 @@ Descriptive Features:
 Target Feature:
 - CO(GT)
 
-# Preprocessing
+# Basic Data Cleaning & Preprocessing
 
 ## Library Loads & Data Imports
 ```{r}
@@ -45,208 +55,154 @@ library(RColorBrewer)
 air_quality_data <- read_excel("AirQualityUCI.xlsx", sheet = "AirQualityUCI")
 ```
 
-## Creating Categorical Features
+## Creating Categorical Features, Other Preprocessing, & Advanced Data Cleaning
 ```{r}
-# Define pollutant columns based on existing column names
+# Define pollutant columns for handling outliers
 pollutant_columns <- c("CO(GT)", "NOx(GT)", "NO2(GT)")
 
-# Grouping by Season and handling outliers in pollutant columns
-air_quality_data <- air_quality_data |>
-  group_by(Season = case_when(
-    format(Date, "%m") %in% c("12", "01", "02") ~ "Winter",
-    format(Date, "%m") %in% c("03", "04", "05") ~ "Spring",
-    format(Date, "%m") %in% c("06", "07", "08") ~ "Summer",
-    format(Date, "%m") %in% c("09", "10", "11") ~ "Autumn"
-  )) |>
-  mutate(
-    across(all_of(pollutant_columns), 
-           ~ ifelse(. > quantile(., 0.95, na.rm = TRUE), 
-                    median(., na.rm = TRUE), .))
-  ) |>
-  ungroup()
-
-# Create additional categorical features
+# Data Preprocessing Pipeline
 air_quality_data <- air_quality_data |>
   mutate(
-    DayOfWeek = weekdays(Date),
-    
-    Weekend = if_else(DayOfWeek %in% c("Saturday", "Sunday"), "Weekend", "Weekday"),
-    
-    Month = format(Date, "%B"), 
-    
-    Hour = as.numeric(format(Time, "%H")), 
-    TimeOfDay = case_when(
-      Hour >= 5 & Hour < 12 ~ "Morning",
-      Hour >= 12 & Hour < 17 ~ "Afternoon",
-      Hour >= 17 & Hour < 21 ~ "Evening",
-      TRUE ~ "Night"
-    ),
-    
-    # Temperature Categories
-    TempCategory = case_when(
-      T < 10 ~ "Cold",
-      T >= 10 & T <= 25 ~ "Moderate",
-      T > 25 ~ "Hot"
-    ),
-    
-    # Humidity Levels
-    HumidityLevel = case_when(
-      RH < 30 ~ "Low",
-      RH >= 30 & RH <= 60 ~ "Medium",
-      RH > 60 ~ "High"
+    Season = case_when(
+      format(Date, "%m") %in% c("12", "01", "02") ~ "Winter",
+      format(Date, "%m") %in% c("03", "04", "05") ~ "Spring",
+      format(Date, "%m") %in% c("06", "07", "08") ~ "Summer",
+      format(Date, "%m") %in% c("09", "10", "11") ~ "Autumn"
     )
-  )
-
-```
-
-## Other Preprocessing
-
-```{r}
-# Handling missing values
-air_quality_data <- air_quality_data |>
-  mutate(
-    across(c(`NOx(GT)`, `NO2(GT)`), ~ na_if(., -200))
   ) |>
-  drop_na() 
-
-# Normalize / Standardize Cont. Vars
-air_quality_data <- air_quality_data |>
+  group_by(Season) |>
+  
+  # Winsorize outliers
   mutate(
-    across(c(T, RH, AH), ~ (. - mean(., na.rm = TRUE)) / sd(., na.rm = TRUE))
+    across(all_of(pollutant_columns),
+           ~ ifelse(. > quantile(., 0.95, na.rm = TRUE), quantile(., 0.95, na.rm = TRUE), .))
+  ) |>
+  ungroup() |>
+  
+  # Handle missing values using conditional replacement
+  mutate(
+    across(c(`NOx(GT)`, `NO2(GT)`), ~ na_if(., -200)),
+    `NOx(GT)` = if_else(is.na(`NOx(GT)`), mean(`NOx(GT)`, na.rm = TRUE), `NOx(GT)`),
+    `NO2(GT)` = if_else(is.na(`NO2(GT)`), mean(`NO2(GT)`, na.rm = TRUE), `NO2(GT)`)
+  ) |>
+  
+  # Standardize Continuous Variables
+  mutate(
+    across(c(T, RH, AH, `PT08.S1(CO)`, `PT08.S5(O3)`), ~ scale(.))
+  ) |>
+  
+  # Add interaction terms
+  mutate(
+    NOx_PT08_S1_Interaction = `NOx(GT)` * `PT08.S1(CO)`,
+    NOx_Season_Interaction = as.numeric(as.factor(Season)) * `NOx(GT)`
   )
 
-# Interaction term
-air_quality_data <- air_quality_data |>
-  mutate(
-    Temp_Humidity_Interaction = T * RH,
-    CO_Temp_Interaction = `CO(GT)` * T
-  )
-
-# Rolling average (Sorted Chronologically)
+# Create lagged feature for CO(GT) (previous hour)
 air_quality_data <- air_quality_data |>
   arrange(Date, Time) |>
   mutate(
-    Rolling_CO = rollmean(`CO(GT)`, k = 5, fill = NA)
+    Lagged_CO = lag(`CO(GT)`, n = 1, default = NA)
   )
 
-# Correlation Matrix
-numeric_cols <- air_quality_data |>
-  select(where(is.numeric))
-cor_matrix <- cor(numeric_cols, use = "complete.obs")
-#print(cor_matrix)
+# Drop rows with missing values introduced by lagged features
+air_quality_data <- drop_na(air_quality_data)
 
-# 1. Correlation Matrix Plot
-numeric_cols <- air_quality_data |>
-  select(where(is.numeric))
-
-cor_matrix <- cor(numeric_cols, use = "complete.obs")
-cor_melt <- melt(cor_matrix)
-
-plot1 <- ggplot(cor_melt, aes(x = Var1, y = Var2, fill = value)) +
-  geom_tile(color = "white") + 
-  scale_fill_gradient2(low = "blue", high = "red", mid = "white",
-                       midpoint = 0, limit = c(-1, 1), space = "Lab",
-                       name = "Correlation") +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)
-  ) + 
-  labs(title = "Correlation Matrix", x = "Features", y = "Features")
-# plot1
-
-# Split dataset
+# Final Dataset Split
 set.seed(123)
 data_split <- initial_split(air_quality_data, prop = 0.7)
 train_data <- training(data_split)
 test_data <- testing(data_split)
-
 ```
 
+# Exploratory & Model Plots
 
-# Exploratory Analysis
-
+## Exploratory Plot/Table 1
 ```{r}
-
-# Define dynamic limits
-co_gt_limits <- c(0, 10)
-ozone_sensor_limits <- c(200, 2500)
-nox_gt_limits <- c(0, 500) 
-sensor_limits <- c(0, 2000)
-
-# 2. NOx(GT) vs CO(GT)
-plot2 <- ggplot(air_quality_data, aes(x = `NOx(GT)`, y = `CO(GT)`)) +
+plot1 <- ggplot(air_quality_data, aes(x = `NOx(GT)`, y = `CO(GT)`)) +
   geom_point(alpha = 0.6, color = "steelblue", size = 1) +
   geom_smooth(method = "lm", se = TRUE, color = "darkred", linetype = "dashed", size = 1) +
-  scale_y_continuous(limits = co_gt_limits) +
-  scale_x_continuous(limits = nox_gt_limits) +
-  labs(title = "NOx(GT) vs CO(GT)",
-       x = "NOx(GT) (Nitrogen Oxides)",
-       y = "CO(GT) (Carbon Monoxide)") +
+  scale_y_continuous(limits = c(-10, 10), breaks = seq(-10, 10, by = 5)) +
+  scale_x_continuous(limits = c(0, 600), breaks = seq(0, 600, by = 100)) +
+  labs(
+    title = "Relationship Between NOx(GT) and CO(GT)",
+    x = "NOx(GT) (Nitrogen Oxides)",
+    y = "CO(GT) (Carbon Monoxide)"
+  ) +
   theme_minimal(base_size = 12) +
-  theme(plot.title = element_text(face = "bold", size = 14))
+  theme(plot.title = element_text(face = "bold"))
 
-# 3. Sensor Data vs CO(GT)
-plot3 <- ggplot(air_quality_data, aes(x = `PT08.S1(CO)`, y = `CO(GT)`)) +
-  geom_point(alpha = 0.6, aes(color = `PT08.S1(CO)`), size = 1.5) +
-  geom_smooth(method = "lm", se = TRUE, color = "darkgreen", linetype = "solid", size = 1) +
-  scale_color_gradient(low = "yellow", high = "red") +
-  scale_y_continuous(limits = co_gt_limits) +
-  scale_x_continuous(limits = sensor_limits) +
-  labs(title = "Sensor Data vs CO(GT)",
-       x = "PT08.S1(CO) (Sensor Data)",
-       y = "CO(GT) (Carbon Monoxide)",
-       color = "Sensor Value") +
-  theme_minimal(base_size = 12) +
-  theme(plot.title = element_text(face = "bold", size = 14))
+# This plot showcases the relationship betwen NOx(GT) and CO(GT), critical to the research question because it visually establishes whether there is a relationship between these variables
 
-# 4. Seasonal Trends in CO(GT)
-plot4 <- ggplot(air_quality_data, aes(x = Season, y = `CO(GT)`, fill = Season)) +
-  geom_boxplot(outlier.shape = 21, outlier.fill = "red", outlier.size = 2, alpha = 0.7) +
-  scale_fill_brewer(palette = "Pastel2") +
-  scale_y_continuous(limits = co_gt_limits) +
-  labs(title = "Seasonal Trends in CO(GT)",
-       x = "Season",
-       y = "CO(GT) (Carbon Monoxide)") +
-  theme_minimal(base_size = 12) +
-  theme(plot.title = element_text(face = "bold", size = 14),
-        legend.position = "none")
-
-# 5. NOx(GT) vs Ozone Sensor Data
-plot5 <- ggplot(air_quality_data, aes(x = `NOx(GT)`, y = `PT08.S5(O3)`)) +
-  geom_point(alpha = 0.6, color = "cyan", size = 1.5) +
-  geom_smooth(method = "lm", se = TRUE, color = "blue", size = 1.2, linetype = "solid") +
-  scale_y_continuous(limits = c(0, 2500)) +
-  scale_x_continuous(limits = nox_gt_limits) +
-  labs(title = "NOx(GT) vs Ozone Sensor",
-       x = "NOx(GT) (Nitrogen Oxides)",
-       y = "PT08.S5(O3) (Ozone Sensor)") +
-  theme_minimal(base_size = 12) +
-  theme(plot.title = element_text(face = "bold", size = 14))
-
-# Arrange plots with better spacing
-final_plot <- (plot2 | plot3) / (plot4 | plot5) +
-  plot_layout(guides = "collect") & theme(legend.position = "bottom")
-
-final_plot
-
-# Correlation Matrix for chosen features
-correlation_data <- air_quality_data |>
-  select(`NOx(GT)`, `CO(GT)`, `PT08.S1(CO)`, `PT08.S5(O3)`)
-cor_matrix <- cor(correlation_data, use = "complete.obs")
-# print(cor_matrix)
-
-# Correlation Matrix Plot for chosen features
-cor_melt <- melt(cor_matrix)
-plot6 <- ggplot(cor_melt, aes(x = Var1, y = Var2, fill = value)) +
-  geom_tile(color = "white") +
-  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-                       midpoint = 0, limit = c(-1, 1), space = "Lab",
-                       name = "Correlation") +
-  theme_minimal(base_size = 12) +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-  labs(title = "Correlation Matrix: NOx(GT), CO(GT), Sensor Data, Ozone Sensor",
-       x = "Features",
-       y = "Features")
-
-#plot6
 ```
+
+## Exploratory Plot/Table 2
+```{r}
+plot2 <- ggplot(air_quality_data, aes(x = `NOx(GT)` * `PT08.S1(CO)`, y = `CO(GT)`, color = Season)) +
+  geom_point(alpha = 0.6, size = 1.5) +
+  geom_smooth(method = "lm", se = TRUE, color = "orange", linetype = "dotted", size = 1) +
+  scale_y_continuous(limits = c(-10, 10), breaks = seq(-10, 10, by = 5)) +
+  scale_x_continuous(limits = c(-2000, 1000), breaks = seq(-2000, 1000, by = 500)) +
+  scale_color_brewer(palette = "Set2") +
+  labs(
+    title = "Interaction Between NOx(GT) and Sensor Data on CO(GT)",
+    x = "NOx(GT) * PT08.S1(CO) (Interaction Term)",
+    y = "CO(GT) (Carbon Monoxide)",
+    color = "Season"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "bottom"
+  )
+
+# This plot examine show the interaction of NOx(GT) and PT08.S1(CO) relates to CO(GT). By categorizing the data by season, it integrates continuous & categorical features and helps with understanding how sensor data correlates with pollutants in different contexts of environment
+```
+
+```{r}
+# Combine the two plots
+final_exploratory_plot <- plot1 | plot2 +
+  plot_layout(guides = "collect") & 
+  theme(legend.position = "bottom")
+
+# Render the combined exploratory plot
+final_exploratory_plot
+
+# In plot 1, the positive correlation between NOx(GT) and CO(GT) indicates that higher NOx levels are associated with higher CO levels, consistent with established emission patterns in urban areas. This aligns with the role of shared sources like vehicle emissions and industrial activities.
+
+# In plot 2, the interaction term highlights the complex relationship between NOx(GT) and PT08.S1(CO), revealing how sensor efficiency varies by season. In winter, the interaction term is often negative, likely due to reduced sensor performance caused by cold temperatures and atmospheric conditions. In contrast, spring and autumn show predominantly positive interaction values, reflecting improved sensor performance, while summer demonstrates the highest efficiency due to favorable environmental factors for pollutant detection.
+```
+
+## Model Plot 1
+```{r}
+
+
+```
+
+## Model Plot 2
+```{r}
+
+
+```
+
+# Linear Models
+
+## Exploratory Linear Model 1
+```{r}
+
+
+```
+
+## Exploratory linear model 2
+```{r}
+
+
+```
+
+## Final Linear Model, Diagnostics & Interpretations
+```{r}
+
+
+```
+
+# Conclusions & Limitations
+
