@@ -12,7 +12,7 @@
 
 # Introduction
 
-## Dataset: 
+## Dataset
 
 Air Quality (UC Irvine) (Vito, S. (2008). Air Quality [Dataset]. UCI Machine Learning Repository. <https://doi.org/10.24432/C59K5F>.)
 
@@ -20,7 +20,7 @@ Air Quality (UC Irvine) (Vito, S. (2008). Air Quality [Dataset]. UCI Machine Lea
 
 Accurate air quality monitoring relies on sensor data to measure pollutants such as ozone, carbon monoxide, and nitrogen oxides. This study examines the correlation between sensor readings and measured pollutant levels to validate monitoring technologies and enhance their predictive capabilities. By leveraging models, I aim to predict carbon monoxide concentrations based on sensor data and other environmental factors.
 
-# Goals/Research Question: 
+# Goals/Research Question
 
 How do sensor measurements (PT08.S1(CO) and PT08.S5(O3)) correlate with observed pollutant levels (NOx(GT) and CO(GT))?
 
@@ -70,6 +70,10 @@ air_quality_data <- air_quality_data |>
       format(Date, "%m") %in% c("09", "10", "11") ~ "Autumn"
     )
   ) |>
+  
+  # This code drops a bunch of values that were all at -200, likely sensor failures since CO & other levels can't be negative or -200 
+  drop_na(`CO(GT)`, `NOx(GT)`, `NO2(GT)`) |>
+  filter(`CO(GT)` >= 0, `NOx(GT)` >= 0, `NO2(GT)` >= 0) |>
   group_by(Season) |>
   
   # Winsorize outliers
