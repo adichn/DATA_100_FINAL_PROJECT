@@ -163,8 +163,6 @@ plot2 <- ggplot(air_quality_data, aes(x = `NOx(GT)` * `PT08.S1(CO)`, y = `CO(GT)
 final_exploratory_plot <- plot1 | plot2 +
   plot_layout(guides = "collect") & 
   theme(legend.position = "bottom")
-
-# Render the combined exploratory plot
 final_exploratory_plot
 
 # In plot 1, the positive correlation between NOx(GT) and CO(GT) indicates that higher NOx levels are associated with higher CO levels, consistent with established emission patterns in urban areas. This aligns with the role of shared sources like vehicle emissions and industrial activities.
@@ -174,35 +172,94 @@ final_exploratory_plot
 
 ## Model Plot 1
 ```{r}
-
+model_plot1 <- ggplot(train_data, aes(x = `PT08.S1(CO)`, y = `CO(GT)`, color = Season)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "CO Sensor vs Ground Truth CO by Season",
+    x = "PT08.S1(CO) Sensor Reading (Standardized)",
+    y = "CO(GT) Ground Truth"
+  ) +
+  theme_minimal()
 
 ```
 
 ## Model Plot 2
 ```{r}
+model_plot2 <- ggplot(train_data, aes(x = `PT08.S5(O3)`, y = `CO(GT)`, color = `NOx(GT)`)) +
+  geom_point(alpha = 0.6) +
+  scale_color_viridis_c() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "O3 Sensor vs CO with NOx Levels",
+    x = "PT08.S5(O3) Sensor Reading (Standardized)", 
+    y = "CO(GT) Ground Truth"
+  ) +
+  theme_minimal()
 
+```
 
+```{r}
+model_plot1 | model_plot2
 ```
 
 # Linear Models
 
 ## Exploratory Linear Model 1
 ```{r}
+# First model focusing on main effects and seasonal interaction
+model1 <- linear_reg() |>
+  set_engine("lm") |>
+  fit(`CO(GT)` ~ `PT08.S1(CO)` * Season + `NOx(GT)`, data = train_data)
 
-
+# Calculate RMSE for model 1
+val_metrics1 <- augment(model1, new_data = test_data) |>
+  summarize(rmse = sqrt(mean((`CO(GT)` - .pred)^2)))
 ```
 
 ## Exploratory linear model 2
 ```{r}
+# Second model incorporating O3 sensor and interaction terms
+model2 <- linear_reg() |>
+  set_engine("lm") |>
+  fit(`CO(GT)` ~ `PT08.S1(CO)` + `PT08.S5(O3)` + `NOx(GT)` + 
+        Season + NOx_PT08_S1_Interaction, data = train_data)
 
-
+# Calculate RMSE for model 2
+val_metrics2 <- augment(model2, new_data = test_data) |>
+  summarize(rmse = sqrt(mean((`CO(GT)` - .pred)^2)))
 ```
 
 ## Final Linear Model, Diagnostics & Interpretations
 ```{r}
 
+# Final model incorporating cleaned data and selected features
+final_model <- linear_reg() |>
+  set_engine("lm") |>
+  fit(`CO(GT)` ~ `PT08.S1(CO)` + `NOx(GT)` + Season + 
+    `PT08.S5(O3)`, data = bind_rows(train_data, test_data))
 
+# Model diagnostics
+diagnostics_plot1 <- augment(final_model, new_data = bind_rows(train_data, test_data)) |>
+  ggplot(aes(x = .pred, y = `CO(GT)`)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(color = "red", linetype = "dashed") +
+  labs(
+    title = "Predicted vs Actual CO(GT) Values",
+    x = "Predicted Values",
+    y = "Actual Values"
+  ) +
+  theme_minimal()
+
+diagnostics_plot2 <- augment(final_model, new_data = bind_rows(train_data, test_data)) |>
+  ggplot(aes(sample = .resid)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "Normal Q-Q Plot of Residuals") +
+  theme_minimal()
+
+final_diagnostics <- diagnostics_plot1 | diagnostics_plot2
+final_diagnostics
 ```
 
 # Conclusions & Limitations
-
