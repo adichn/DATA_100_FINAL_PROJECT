@@ -107,6 +107,15 @@ air_quality_data <- air_quality_data |>
 # Drop rows with missing values introduced by lagged features
 air_quality_data <- drop_na(air_quality_data)
 
+# Improved data cleaning for CO(GT)
+air_quality_clean <- air_quality_data |>
+  # Replace -200 values with NA since they appear to be missing data markers
+  mutate(
+    `CO(GT)` = ifelse(`CO(GT)` == -200, NA, `CO(GT)`)
+  ) |>
+  drop_na(`CO(GT)`) |>
+  filter(`CO(GT)` >= 0) 
+
 # Final Dataset Split
 set.seed(123)
 data_split <- initial_split(air_quality_data, prop = 0.7)
