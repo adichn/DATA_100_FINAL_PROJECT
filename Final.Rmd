@@ -4,16 +4,24 @@ author: "Aditya Chauhan"
 date: "`r Sys.Date()`"
 output: 
   pdf_document:
-    fig_width: 12
-    fig_height: 8
+    fig_width: 10
+    fig_height: 6
     fig_caption: true
+geometry: "left=0.75in,right=0.75in,top=1in,bottom=1in"
 header-includes:
-   - \usepackage{geometry}
-   - \geometry{margin=1in}
    - \usepackage{float}
    - \floatplacement{figure}{H}
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  out.width = "90%"
+)
+```
 
 ---------------------------------
 
@@ -71,6 +79,9 @@ air_quality_data <- read_excel("AirQualityUCI.xlsx", sheet = "AirQualityUCI")
 ```
 
 ## Creating Categorical Features, Other Preprocessing, & Advanced Data Cleaning
+
+A: This code drops a bunch of values that were all at -200, likely sensor failures since CO & other levels can't be negative or -200 
+
 ```{r}
 
 # Data Preprocessing Pipeline
@@ -94,7 +105,7 @@ air_quality_data <- air_quality_data |>
     )
   ) |>
   
-  # This code drops a bunch of values that were all at -200, likely sensor failures since CO & other levels can't be negative or -200 
+  # A
   drop_na(`CO(GT)`, `NOx(GT)`, `NO2(GT)`) |>
   filter(`CO(GT)` >= 0, `NOx(GT)` >= 0, `NO2(GT)` >= 0) |>
   group_by(Season) |>
@@ -174,6 +185,9 @@ test_data <- testing(validation_split)
 # Exploratory & Model Plots
 
 ## Exploratory Plot/Table 1
+
+This plot showcases the relationship betwen NOx(GT) and CO(GT), critical to the research question because it visually establishes whether there is a relationship between these variables. It also shows density at certain values. 
+
 ```{r}
 plot1 <- ggplot(air_quality_data, aes(x = `NOx(GT)`, y = `CO(GT)`)) +
   geom_hex(bins = 30) +
@@ -190,11 +204,12 @@ plot1 <- ggplot(air_quality_data, aes(x = `NOx(GT)`, y = `CO(GT)`)) +
   theme_minimal(base_size = 12) +
   theme(plot.title = element_text(face = "bold"))
 
-# This plot showcases the relationship betwen NOx(GT) and CO(GT), critical to the research question because it visually establishes whether there is a relationship between these variables. It also shows density at certain values. 
-
 ```
 
 ## Exploratory Plot/Table 2
+
+This plot examine show the interaction of NOx(GT) and PT08.S1(CO) relates to CO(GT). By categorizing the data by season, it integrates continuous & categorical features and helps with understanding how sensor data correlates with pollutants in different contexts of environment.
+
 ```{r}
 plot2 <- ggplot(air_quality_data, aes(x = `NOx(GT)` * `PT08.S1(CO)`, y = `CO(GT)`, color = Season)) +
   geom_point(alpha = 0.6, size = 1.5) +
@@ -213,8 +228,6 @@ plot2 <- ggplot(air_quality_data, aes(x = `NOx(GT)` * `PT08.S1(CO)`, y = `CO(GT)
     plot.title = element_text(face = "bold"),
     legend.position = "bottom"
   )
-
-# This plot examine show the interaction of NOx(GT) and PT08.S1(CO) relates to CO(GT). By categorizing the data by season, it integrates continuous & categorical features and helps with understanding how sensor data correlates with pollutants in different contexts of environment
 ```
 
 ```{r, fig.width=12, fig.height=8, out.width="100%"}
@@ -223,11 +236,11 @@ final_exploratory_plot <- plot1 | plot2 +
   plot_layout(guides = "collect") & 
   theme(legend.position = "bottom")
 final_exploratory_plot
-
-# In plot 1, the positive correlation between NOx(GT) and CO(GT) indicates that higher NOx levels are associated with higher CO levels, consistent with established emission patterns in urban areas. This aligns with the role of shared sources like vehicle emissions and industrial activities.
-
-# In plot 2, the interaction term highlights the complex relationship between NOx(GT) and PT08.S1(CO), revealing how sensor efficiency varies by season. In winter, the interaction term is often negative, likely due to reduced sensor performance caused by cold temperatures and atmospheric conditions. In contrast, spring and autumn show predominantly positive interaction values, reflecting improved sensor performance, while summer demonstrates the highest efficiency due to favorable environmental factors for pollutant detection.
 ```
+
+In plot 1, the positive correlation between NOx(GT) and CO(GT) indicates that higher NOx levels are associated with higher CO levels, consistent with established emission patterns in urban areas. This aligns with the role of shared sources like vehicle emissions and industrial activities.
+
+In plot 2, the interaction term highlights the complex relationship between NOx(GT) and PT08.S1(CO), revealing how sensor efficiency varies by season. In winter, the interaction term is often negative, likely due to reduced sensor performance caused by cold temperatures and atmospheric conditions. In contrast, spring and autumn show predominantly positive interaction values, reflecting improved sensor performance, while summer demonstrates the highest efficiency due to favorable environmental factors for pollutant detection.
 
 ## Model Plot 1
 ```{r}
@@ -268,11 +281,11 @@ model_plot2 <- ggplot(train_data, aes(x = `PT08.S5(O3)`, y = `CO(GT)`, color = `
 
 ```{r, fig.width=12, fig.height=8, out.width="100%"}
 model_plot1 | model_plot2
-
-# The ridgeline plot in Model Plot 1 demonstrates the relationship between multiple features (Seasons, PT08.S1(CO) sensor readings), by showing how CO(GT) distributions vary across different sensor level categories & seasons. This directly address the question about sensor measurement correlations because the distinct peaks and overlapping distributions reveal seasonal patterns in sensor reliability, which clearly varies. 
-
-# The scatter plot in Model Plto 2 examines the relationship between the O3 sensor and CO ground truthm with NOx levels shown through the colour gradient. This is relevant because it shows potential cross-sensitivity between O3 & CO sensors while accounting for NOx interference. 
 ```
+
+The ridgeline plot in Model Plot 1 demonstrates the relationship between multiple features (Seasons, PT08.S1(CO) sensor readings), by showing how CO(GT) distributions vary across different sensor level categories & seasons. This directly address the question about sensor measurement correlations because the distinct peaks and overlapping distributions reveal seasonal patterns in sensor reliability, which clearly varies. 
+
+The scatter plot in Model Plto 2 examines the relationship between the O3 sensor and CO ground truthm with NOx levels shown through the colour gradient. This is relevant because it shows potential cross-sensitivity between O3 & CO sensors while accounting for NOx interference. 
 
 # Linear Models
 
