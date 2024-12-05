@@ -1,3 +1,20 @@
+---
+title: "Air Quality Analysis"
+author: "Aditya Chauhan"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    fig_width: 12
+    fig_height: 8
+    fig_caption: true
+header-includes:
+   - \usepackage{geometry}
+   - \geometry{margin=1in}
+   - \usepackage{float}
+   - \floatplacement{figure}{H}
+---
+
+
 ---------------------------------
 
 ### Name: Aditya Chauhan
@@ -200,7 +217,7 @@ plot2 <- ggplot(air_quality_data, aes(x = `NOx(GT)` * `PT08.S1(CO)`, y = `CO(GT)
 # This plot examine show the interaction of NOx(GT) and PT08.S1(CO) relates to CO(GT). By categorizing the data by season, it integrates continuous & categorical features and helps with understanding how sensor data correlates with pollutants in different contexts of environment
 ```
 
-```{r, fig.width=12, fig.height=8}
+```{r, fig.width=12, fig.height=8, out.width="100%"}
 # Combine the two plots
 final_exploratory_plot <- plot1 | plot2 +
   plot_layout(guides = "collect") & 
@@ -249,7 +266,7 @@ model_plot2 <- ggplot(train_data, aes(x = `PT08.S5(O3)`, y = `CO(GT)`, color = `
 
 ```
 
-```{r, fig.width=12, fig.height=8}
+```{r, fig.width=12, fig.height=8, out.width="100%"}
 model_plot1 | model_plot2
 
 # The ridgeline plot in Model Plot 1 demonstrates the relationship between multiple features (Seasons, PT08.S1(CO) sensor readings), by showing how CO(GT) distributions vary across different sensor level categories & seasons. This directly address the question about sensor measurement correlations because the distinct peaks and overlapping distributions reveal seasonal patterns in sensor reliability, which clearly varies. 
@@ -317,7 +334,7 @@ model_comparison <- tibble(
 
 ```
 
-```{r, fig.width=12, fig.height=8}
+```{r, fig.width=12, fig.height=8, out.width="100%"}
 # Create comparison plot
 model_comparison_plot <- ggplot(model_comparison, aes(x = reorder(Model, -RMSE), y = RMSE)) +
   geom_col(aes(fill = RMSE)) +
@@ -343,7 +360,7 @@ model_comparison_plot
 ```
 
 ## Bar Plot
-```{r, fig.width=12, fig.height=8}
+```{r, fig.width=12, fig.height=8, out.width="100%"}
 # Create seasonal average bar plot
 seasonal_plot <- ggplot(air_quality_data |>
                          group_by(Season) |>
@@ -369,7 +386,7 @@ seasonal_plot
 
 
 # Final Linear Model, Diagnostics & Interpretations
-```{r, fig.width=12, figh.height=8}
+```{r, fig.width=12, fig.height=8, out.width="100%"}
 # Train final model on combined train + validation data
 final_training_data <- bind_rows(train_data, validation_data)
 
@@ -488,7 +505,7 @@ The analysis directly addressed both research questions, revealing key insights 
   - Seasonal interactions proved crucial, with the model capturing how sensor performance varise across different times of year
   
 
-## Limitation
+## Limitations
 
 - Data limitations
   - Missing values & sensor failures required extensive cleaning
