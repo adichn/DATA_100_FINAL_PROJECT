@@ -2,15 +2,16 @@
 title: "Air Quality Analysis"
 author: "Aditya Chauhan"
 date: "`r Sys.Date()`"
-output: 
+output:
   pdf_document:
     fig_width: 10
     fig_height: 6
     fig_caption: true
-geometry: "left=0.75in,right=0.75in,top=1in,bottom=1in"
+  word_document: default
+geometry: left=0.75in,right=0.75in,top=1in,bottom=1in
 header-includes:
-   - \usepackage{float}
-   - \floatplacement{figure}{H}
+- \usepackage{float}
+- \floatplacement{figure}{H}
 ---
 
 ID: 169027493
@@ -28,7 +29,13 @@ Air Quality (UC Irvine) (Vito, S. (2008). Air Quality [Dataset]. UCI Machine Lea
 Accurate air quality monitoring relies on sensor data to measure pollutants such as ozone, carbon monoxide, and nitrogen oxides. This study examines the correlation between sensor readings and measured pollutant levels to validate monitoring technologies and enhance their predictive capabilities. By leveraging models, I aim to predict carbon monoxide concentrations based on sensor data and other environmental factors.
 
 ### Goals/Research Question
+
+How do sensor measurements (PT08.S1(CO) and PT08.S5(O3)) correlate with observed pollutant levels (NOx(GT) and CO(GT))?
+
+Can these relationships improve the accuracy of carbon monoxide concentration predictions?
 Descriptive Features:
+
+### Features
 
 - Continuous
 
@@ -388,6 +395,12 @@ print("\nModel Performance Metrics:")
 final_metrics
 final_diagnostics
 ```
+
+The first diagnostic plot, showing predicted versus actual CO(GT) values, demonstrates the model's strong predictive performance with points clustering along the ideal diagonal line. The R² value of 0.770 indicates that sensor measurements effectively capture CO concentration variations, though some outliers (labeled 2.78, -2.72, -2.37) highlight where predictions deviate most significantly. The close alignment validates that sensor readings reliably correlate with ground truth measurements.
+
+The Normal Q-Q plot confirms the statistical validity of the model's assumptions by showing residuals largely following the expected normal distribution line. While slight deviations appear in the tails, the overall pattern supports the reliability of the relationships discovered between sensor readings and actual pollutant levels. This validation strengthens confidence in the model's ability to establish meaningful correlations between sensor data and CO concentrations.
+
+The residuals versus fitted values plot reveals consistent prediction accuracy across different pollution levels, with errors evenly distributed around zero. The relatively flat trend line and balanced spread of residuals indicate that sensors perform reliably regardless of pollution intensity. This consistent performance pattern, combined with the RMSE of 0.613, demonstrates that the sensor measurements can effectively predict CO concentrations across varying environmental conditions.
 
 ## Conclusions & Discussion
 
