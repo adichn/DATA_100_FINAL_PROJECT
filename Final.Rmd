@@ -17,7 +17,7 @@ ID: 169027493
 
 Class: DATA 100 A
 
-Professor: Dr. Devon Becker
+Professor: Dr. Devan Becker
 
 ## Introduction
 Dataset:
@@ -29,13 +29,19 @@ Accurate air quality monitoring relies on sensor data to measure pollutants such
 
 ### Goals/Research Question
 Descriptive Features:
+
 - Continuous
+
   - Sensor targeting CO - PT08.S1(CO)
   - Sensor targeting O3 - PT08.S5(O3)
   - True averaged sensor response - NOx(GT)
+  
 - Categorical
+
   - Season - Based on Dates
+  
 Target Feature:
+
 - True Concentration of CO - CO(GT)
 
 ## Basic Data Cleaning & Preprocessing
